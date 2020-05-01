@@ -12,14 +12,14 @@ BUILD = "Build"
 EXTERNAL = "External"
 HOT_FIX = "Hotfix"
 IDEMPOTENT = "Idempotent"
-INTERNAL = 'Internal'
+INTERNAL = "Internal"
 MAJOR = "MajorVersion"
 METHOD_ACCESS = "MethodAccess"
 METHOD_ACCESS_CHECKED = "MethodAccessChecked"
 METHOD_CLASS = "MethodClass"
-METHOD_LIST = 'MethodList'
+METHOD_LIST = "MethodList"
 MINOR = "MinorVersion"
-NAME = 'Name'
+NAME = "Name"
 NOT_SET = "NOT FOUND"
 RESULT_TYPE = "ResultType"
 VERSION = "Version"
@@ -65,7 +65,7 @@ def verify_cols_are_present(source: typing.List[str], expected: typing.List[str]
     """
     diff = set(expected) - set(source)
     if diff:
-        print(f"Column Mismatch: {diff}")
+        print(f"ERROR:\n\tColumn Mismatch(es): {diff}")
     return not diff
 
 
@@ -128,7 +128,7 @@ if __name__ == "__main__":
         sys.exit()
 
     # Generate the CSV files for INTERNAL and EXTERNAL APIs.
-    print(f"All expected columns present, generating CSVs.")
+    print("All expected columns present, generating CSVs.")
     for data_type, api_dict in api_data.items():
         write_csv_from_dict(filename=f"{data_type.lower()}_apis.csv",
                             ordered_column_header=[c for c in expected_cols if c != INTERNAL],
