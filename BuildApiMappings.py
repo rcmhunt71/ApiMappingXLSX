@@ -7,7 +7,7 @@ import sys
 import typing
 
 import xlsxwriter
-
+from xlsxwriter.worksheet import Worksheet
 
 # ---------------------------
 #         CONSTANTS
@@ -180,6 +180,34 @@ class ExcelFile:
             index += 1
         return unique_wks_name
 
+    def _build_header(self, worksheet: Worksheet, column_dict: typing.Dict[str, str],
+                      column_width_dict: typing.Dict[str, int]) -> typing.Dict[str, int]:
+        """
+        Builds and formats header row for specified worksheet based on entries in column_dict
+        Args:
+            worksheet: Worksheet to add header
+            column_dict: Ordered Dictionary ==> k:column_names, v:default_alignments
+            column_width_dict: dict for tracking longest entry in each column (used for resizing/auto-fit cols).
+
+        Returns:
+            column_width_dictionary (for use within worksheet population)
+        """
+        for column_index, column_name in enumerate(column_dict.keys()):
+
+            # Align the column accordingly and make the entries bold.
+            column_format = self._workbook.add_format(
+                {'align': column_dict[column_name], 'bold': True})
+
+            # Set header background to light gray
+            column_format.set_bg_color("D9D9D9")
+
+            worksheet.write(0, column_index, column_name, column_format)
+            column_width_dict[column_name] = len(column_name)
+
+        # Freeze the top pane (header row) of the spreadsheet
+        worksheet.freeze_panes(1, 0)
+        return column_width_dict
+
     def close_workbook(self) -> typing.NoReturn:
         """
         Closes the workbook and writes the workbook to file.
@@ -207,7 +235,6 @@ class ExcelFile:
             None
 
         """
-        column_width = {}
         column_buffer = 7  # Add a little bit of margin due to font kerning (not all letters take up the same space)
 
         worksheet_name = worksheet_name if worksheet_name != '' else self.filename
@@ -216,20 +243,9 @@ class ExcelFile:
         unique_worksheet_name = self._get_unique_worksheet_name(worksheet_name=worksheet_name)
         worksheet = self._workbook.add_worksheet(unique_worksheet_name)
 
-        # Populate and format the header row
-        for column_index, column_name in enumerate(column_alignment_dict.keys()):
-
-            # Align the column accordingly and make the entries bold.
-            column_format = self._workbook.add_format(
-                {'align': column_alignment_dict[column_name], 'bold': True})
-
-            # Set header background to light gray
-            column_format.set_bg_color("D9D9D9")
-            worksheet.write(0, column_index, column_name, column_format)
-            column_width[column_name] = len(column_name)
-
-        # Freeze the top pane (header row) of the spreadsheet
-        worksheet.freeze_panes(1, 0)
+        # Builder worksheet header row
+        column_width = self._build_header(
+            worksheet=worksheet, column_dict=column_alignment_dict, column_width_dict={})
 
         # Populate the remainder of the worksheet, sorted by sort_key, starting at row 2 (row 1= header).
         # Also track the length of all entries for each column, so that the columns can be resized correctly.
