@@ -145,7 +145,7 @@ class ExcelFile:
             None
         """
         self._workbook.close()
-        print(f"Created XLSX File: {self.filename}")
+        print(f"Workbook: Wrote XLSX: {self.filename}")
 
     def create_worksheet(self, column_alignment_dict: typing.Dict[str, str], data_list: typing.List[dict],
                          sort_key: str = NAME, worksheet_name: str = '') -> typing.NoReturn:
@@ -191,7 +191,7 @@ class ExcelFile:
             column_format = self._workbook.add_format({'align': column_alignment_dict[column_name]})
             worksheet.set_column(column_index, column_index, column_width[column_name] + column_buffer, column_format)
 
-        print(f"Created and populated an excel worksheet: {unique_worksheet_name}")
+        print(f"Worksheet: Created/populated: {unique_worksheet_name}")
 
 
 # -------------------------------------------------------
@@ -310,7 +310,7 @@ if __name__ == "__main__":
             expected=list(column_alignment.keys())):
         print("Unable to generate files, data columns do not match expected columns...\nExiting.\n")
         sys.exit()
-    print("All expected columns present, generating designated files.")
+    print("Validation: All expected columns present, generating requested files.")
 
     # If XLSX, create the workbook and set the properties.
     if CREATE_XLSX:
@@ -341,4 +341,4 @@ if __name__ == "__main__":
         xlsx_workbook.close_workbook()
 
     # Print out the version for reference.
-    print(f"Files generated for PRICE API VERSION: {version}")
+    print(f"COMPLETE: Generated using PRICE API VERSION: {version}")
