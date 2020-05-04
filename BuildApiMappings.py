@@ -165,7 +165,10 @@ class ExcelFile:
             None
 
         """
-        column_buffer = 7  # Add a little bit of margin due to font kerning (not all letters take up the same space)
+        # Add a little bit of column margin due to font kerning (not all letters take up the same space).
+        # Not needed for non-kerning fonts, such as Courier, but the font needs to be explicitly defined.
+        # Currently, we are not defining the font, so Execl will default to Arial.
+        column_buffer = 7
 
         worksheet_name = worksheet_name if worksheet_name != '' else self.filename
 
@@ -178,7 +181,7 @@ class ExcelFile:
             worksheet=worksheet, column_dict=column_alignment_dict, column_width_dict={})
 
         # Populate the remainder of the worksheet, sorted by sort_key, starting at row 2 (row 1= header).
-        # Also track the length of all entries for each column, so that the columns can be resized correctly.
+        # Also track the length of each entries for each column, so that each column can be resized correctly.
         for row_index, row_data in enumerate(sorted(data_list, key=operator.itemgetter(sort_key)), start=1):
             for column_index, column_name in enumerate(column_alignment_dict):
                 entry = str(row_data.get(column_name))
@@ -217,12 +220,14 @@ def get_api_list(url: str) -> typing.Dict[str, typing.Any]:
     Returns: (dict) JSON response, if the response code was 2xx.
 
     """
+    payload = {}
     response = requests.get(url)
     if int(response.status_code) / 100 != 2:
         print(f"Unable to get API information. Rec'd status code: {response.status_code}")
-        return {}
+    else:
+        payload = json.loads(response.text)
 
-    return json.loads(response.text)
+    return payload
 
 
 def verify_cols_are_present(source: typing.List[str], expected: typing.List[str]) -> bool:
@@ -242,33 +247,27 @@ def verify_cols_are_present(source: typing.List[str], expected: typing.List[str]
     return not diff
 
 
-def write_csv_from_dict(
-        filename: str, ordered_column_header: typing.List[str], data_list: typing.List[dict],
-        sort_key=NAME) -> typing.NoReturn:
+def define_expected_columns() -> OrderedDict:
     """
-    Writes the dictionary for each API in the list to a CSV file, using the expected column headers in the
-    provided order.
-
-    Args:
-        filename: Name of file to write
-        ordered_column_header: list of columns to write to the CSV file.
-        data_list: list where each element defines a dictionary describing an API
-        sort_key: (optional) sort the rows based on one of the header elements (DEFAULT: NAME Constant)
+    Define the expected data columns (as provided by the API data); they are defined in the order
+    that they should be presented in the output (e.g. - spreadsheet), and the expected alignment in the
+    output file (e.g. - names are left justified, booleans are centered, etc.).
 
     Returns:
-        None.
+        Order Dictionary, where K: Column Name, V: alignment in output.
+
     """
+    columns = OrderedDict()
 
-    # Open the file, write the header row, and then the data.
-    with open(filename, "w", newline='') as FILE:
-        writer = csv.writer(FILE)
-        writer.writerow(ordered_column_header)
+    columns[NAME] = ExcelFile.LEFT
+    columns[IDEMPOTENT] = ExcelFile.CENTER
+    columns[RESULT_TYPE] = ExcelFile.LEFT
+    columns[METHOD_ACCESS_CHECKED] = ExcelFile.CENTER
+    columns[METHOD_CLASS] = ExcelFile.LEFT
+    columns[INTERNAL] = ExcelFile.CENTER
+    columns[METHOD_ACCESS] = ExcelFile.LEFT
 
-        # Sort the data by the sort_key and write to file.
-        for row in sorted(data_list, key=operator.itemgetter(sort_key)):
-            writer.writerow([row.get(col) for col in ordered_column_header])
-
-    print(f"Wrote file: {filename}")
+    return columns
 
 
 # -------------------------------------------------------
@@ -279,19 +278,8 @@ if __name__ == "__main__":
     # API URL for list of all APIs
     api_url = 'https://price.pclender.com/nexbank/method_list'
 
-    # File formats to create
-    CREATE_CSV = False
-    CREATE_XLSX = True
-
     # Expected Data Columns (in desired displayed order) and their alignments
-    column_alignment = OrderedDict()
-    column_alignment[NAME] = ExcelFile.LEFT
-    column_alignment[IDEMPOTENT] = ExcelFile.CENTER
-    column_alignment[RESULT_TYPE] = ExcelFile.LEFT
-    column_alignment[METHOD_ACCESS_CHECKED] = ExcelFile.CENTER
-    column_alignment[METHOD_CLASS] = ExcelFile.LEFT
-    column_alignment[INTERNAL] = ExcelFile.CENTER
-    column_alignment[METHOD_ACCESS] = ExcelFile.LEFT
+    column_alignment = define_expected_columns()
 
     # Get the data (dictionaries) from the PRICE URL
     full_data = get_api_list(url=api_url)
@@ -300,7 +288,7 @@ if __name__ == "__main__":
 
     # Build lists of API dictionaries based on INTERNAL or EXTERNAL data (NOTE: EXTERNAL = not INTERNAL)
     api_data = {
-        EXTERNAL:  [rows for rows in raw_api_data if not rows.get(INTERNAL, False)],
+        EXTERNAL: [rows for rows in raw_api_data if not rows.get(INTERNAL, False)],
         INTERNAL: [rows for rows in raw_api_data if rows.get(INTERNAL, False)],
     }
 
@@ -312,33 +300,26 @@ if __name__ == "__main__":
         sys.exit()
     print("Validation: All expected columns present, generating requested files.")
 
-    # If XLSX, create the workbook and set the properties.
-    if CREATE_XLSX:
-        xlsx_workbook = ExcelFile(filename=f"API_Mapping_{version}.xlsx")
-        xlsx_workbook.set_workbook_properties(
-            title=f"PRICE API Mapping: {version}", subject="PRICE APIs", keywords="API",
-            comments="Generated by Fiserv Product Automation", status="In Production", author="Python Automation")
-
     # No longer needed since the data is segregated by this value.
     del column_alignment[INTERNAL]
+
+    # Create the workbook and set the properties.
+    xlsx_workbook = ExcelFile(filename=f"API_Mapping_{version}.xlsx")
+    xlsx_workbook.set_workbook_properties(
+        title=f"PRICE API Mapping: {version}", subject="PRICE APIs", keywords="API",
+        comments="Generated by Fiserv Product Automation", status="In Production", author="Python Automation")
 
     # Generate the output files for INTERNAL and EXTERNAL APIs.
     for data_type, api_dict in api_data.items():
 
-        if CREATE_CSV:
-            write_csv_from_dict(
-                filename=f"{data_type.lower()}_apis.csv", ordered_column_header=list(column_alignment.keys()),
-                data_list=api_dict)
+        # Internal and external API worksheets
+        xlsx_workbook.create_worksheet(
+            column_alignment_dict=column_alignment, data_list=api_dict, worksheet_name=data_type)
 
-        if CREATE_XLSX:
-            xlsx_workbook.create_worksheet(
-                column_alignment_dict=column_alignment, data_list=api_dict, worksheet_name=data_type)
-
-    # If building an XLSX file: add the version worksheet where the name = version number
-    if CREATE_XLSX:
-        xlsx_workbook.create_worksheet(column_alignment_dict={"Version": ExcelFile.LEFT},
-                                       data_list=[{VERSION: version}], worksheet_name=version, sort_key=VERSION)
-        xlsx_workbook.close_workbook()
+    # Add the version worksheet where the name = version number
+    xlsx_workbook.create_worksheet(column_alignment_dict={"Version": ExcelFile.LEFT},
+                                   data_list=[{VERSION: version}], worksheet_name=version, sort_key=VERSION)
+    xlsx_workbook.close_workbook()
 
     # Print out the version for reference.
     print(f"COMPLETE: Generated using PRICE API VERSION: {version}")
