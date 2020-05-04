@@ -1,5 +1,4 @@
 from collections import OrderedDict
-import csv
 import json
 import operator
 import requests
@@ -27,6 +26,7 @@ MINOR = "MinorVersion"
 NAME = "Name"
 NOT_SET = "NOT FOUND"
 RESULT_TYPE = "ResultType"
+URL = "URL"
 VERSION = "Version"
 
 
@@ -277,6 +277,8 @@ if __name__ == "__main__":
 
     # API URL for list of all APIs
     api_url = 'https://price.pclender.com/nexbank/method_list'
+    if len(sys.argv) > 1:
+        api_url = sys.argv[1]
 
     # Expected Data Columns (in desired displayed order) and their alignments
     column_alignment = define_expected_columns()
@@ -317,8 +319,9 @@ if __name__ == "__main__":
             column_alignment_dict=column_alignment, data_list=api_dict, worksheet_name=data_type)
 
     # Add the version worksheet where the name = version number
-    xlsx_workbook.create_worksheet(column_alignment_dict={"Version": ExcelFile.LEFT},
-                                   data_list=[{VERSION: version}], worksheet_name=version, sort_key=VERSION)
+    xlsx_workbook.create_worksheet(column_alignment_dict={VERSION: ExcelFile.LEFT, URL: ExcelFile.LEFT},
+                                   data_list=[{VERSION: version, URL: api_url}],
+                                   worksheet_name=version, sort_key=VERSION)
     xlsx_workbook.close_workbook()
 
     # Print out the version for reference.
